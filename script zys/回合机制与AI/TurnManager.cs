@@ -22,16 +22,27 @@ public class TurnManager : MonoBehaviour
     public int playerMaxAP = 3;    // 我方每回合几点行动值
     public int enemyMaxAP = 3;     // 敌方每回合几点行动值（填 0 = 敌方回合直接跳过，不做任何行动）
 
+    [Header("决策值设置")]
+    public int maxDecisionPoints = 10;      // 决策值上限（可跨回合攒）
+    public int decisionGainPerTurn = 5;     // 每回合补充多少
+    public int moveDecisionCost = 1;        // 移动一次消耗
+    public int attackDecisionCost = 1;      // 攻击一次消耗
+
     [Header("接线")]
     public CardDealer dealer;      // 发牌器（我方回合开始自动发牌）
     public Text apText;            // 左下角行动值文字（不拖就自动造一个）
     public Button endTurnButton;   // "回合结束"按钮（不拖就自动造一个）
+
+    [Header("演算")]
+    [Tooltip("移动/攻击的演算调度器；不拖会自动找")]
+    public MoveReplayDirector replayDirector;
 
     [Header("敌方 AI 设置")]
     public float enemyActionDelay = 0.8f;  // 敌方每次行动之间停多久（让玩家看清发生了什么）
 
     public Side CurrentSide { get; private set; }   // 现在是谁的回合
     public int CurrentAP { get; private set; }      // 当前这方还剩几点行动值
+    public int DecisionPoints { get; private set; } // 我方剩余决策值（移动 / 攻击用）
 
     void Awake()
     {
@@ -41,6 +52,17 @@ public class TurnManager : MonoBehaviour
     void Start()
     {
         if (dealer == null) dealer = FindObjectOfType<CardDealer>();
+
+        if (replayDirector == null) replayDirector = MoveReplayDirector.Ensure();
+        replayDirector.autoEndByTime = false;   // 由「回合结束」按钮或倒计时 0 触发
+
+        // 没挂倒计时就自动补一个（顶部居中显示）
+        if (FindObjectOfType<PlanningCountdown>() == null)
+        {
+            gameObject.AddComponent<PlanningCountdown>();
+            Debug.Log("[回合] 自动添加 PlanningCountdown");
+        }
+
         SetupAPText();
         SetupEndTurnButton();
 
@@ -56,13 +78,19 @@ public class TurnManager : MonoBehaviour
 
     // ══════════ 查询：现在能不能出牌？══════════
 
-    // 只有"我方回合 + 还有行动值"才能出牌
+    // 只有"我方回合 + 还有行动值 + 不在演算中"才能出牌
     public bool CanPlayerAct()
     {
-        return CurrentSide == Side.Player && CurrentAP > 0;
+        return CurrentSide == Side.Player && CurrentAP > 0 && !IsReplaying;
     }
 
     public bool IsPlayerTurn { get { return CurrentSide == Side.Player; } }
+
+    /// <summary>正在演算（规划期已结束，船在动、炮在飞）</summary>
+    public bool IsReplaying
+    {
+        get { return replayDirector != null && !replayDirector.IsPlanning; }
+    }
 
     // 出牌成功后调用：扣 1 点行动值
     public void SpendAP()
@@ -75,6 +103,30 @@ public class TurnManager : MonoBehaviour
     public void SetAP(int value)
     {
         CurrentAP = value;
+        RefreshAPUI();
+    }
+
+    // ══════════ 决策值（移动 / 攻击用，和行动值互不影响）══════════
+
+    /// <summary>决策值够不够（且必须是我方回合）</summary>
+    public bool CanSpendDecision(int cost)
+    {
+        return IsPlayerTurn && DecisionPoints >= cost;
+    }
+
+    /// <summary>扣决策值；不够返回 false，调用方不要执行动作</summary>
+    public bool TrySpendDecision(int cost)
+    {
+        if (!CanSpendDecision(cost)) return false;
+        DecisionPoints -= cost;
+        RefreshAPUI();
+        return true;
+    }
+
+    /// <summary>退还决策值（取消指令时用）</summary>
+    public void RefundDecision(int cost)
+    {
+        DecisionPoints = Mathf.Min(DecisionPoints + cost, maxDecisionPoints);
         RefreshAPUI();
     }
 
@@ -97,7 +149,19 @@ public class TurnManager : MonoBehaviour
     {
         CurrentSide = Side.Player;
         CurrentAP = playerMaxAP;
-        Debug.Log("=== 我方回合开始，行动值 " + CurrentAP + " ===");
+
+        // 决策值：每回合 +5，上限 10（可以攒着不用）
+        DecisionPoints = Mathf.Min(DecisionPoints + decisionGainPerTurn, maxDecisionPoints);
+
+        // 新回合：清空上一回合的演算指令，回到规划期
+        if (replayDirector != null) replayDirector.ClearOrders();
+
+        // 新回合：所有船恢复"本回合还能移动一次"
+        ShipMover[] movers = FindObjectsOfType<ShipMover>();
+        for (int i = 0; i < movers.Length; i++)
+            if (movers[i] != null) movers[i].ResetTurnFlag();
+
+        Debug.Log("=== 我方回合开始，行动值 " + CurrentAP + "，决策值 " + DecisionPoints + " ===");
 
         TickAllBuffs();   // ★ 我方回合开始 → 所有船的 buff 剩余回合 -1，到 0 的消除
 
@@ -105,7 +169,7 @@ public class TurnManager : MonoBehaviour
         RefreshAPUI();
     }
 
-    // 点"回合结束"按钮 → 调这个
+    // 点"回合结束"按钮 → 调这个：先播演算，演算完再进敌方回合
     public void EndPlayerTurn()
     {
         if (CurrentSide != Side.Player)
@@ -113,7 +177,24 @@ public class TurnManager : MonoBehaviour
             Debug.Log("现在不是我方回合，点结束无效");
             return;
         }
+        if (IsReplaying) return;
+
         Debug.Log("=== 我方回合结束 ===");
+
+        if (replayDirector != null)
+        {
+            replayDirector.onReplayFinished = OnReplayFinished;
+            replayDirector.BeginReplay();
+            RefreshAPUI();
+            return;
+        }
+
+        StartEnemyTurn();
+    }
+
+    // 演算播完 → 交还敌方回合
+    void OnReplayFinished()
+    {
         StartEnemyTurn();
     }
 
@@ -215,7 +296,7 @@ public class TurnManager : MonoBehaviour
         rt.anchorMax = new Vector2(0f, 0f);
         rt.pivot = new Vector2(0f, 0f);
         rt.anchoredPosition = new Vector2(30f, 30f);
-        rt.sizeDelta = new Vector2(420f, 90f);
+        rt.sizeDelta = new Vector2(560f, 90f);
     }
 
     void RefreshAPUI()
@@ -223,13 +304,12 @@ public class TurnManager : MonoBehaviour
         if (apText != null)
         {
             string who = CurrentSide == Side.Player ? "我方" : "敌方";
-            apText.text = $"{who}回合\n行动值：{CurrentAP}";
-            apText.color = CurrentSide == Side.Player ? Color.yellow : Color.red;
-        }
+            apText.text = $"{who}回合\n行动值：{CurrentAP}   决策值：{DecisionPoints}";
+            apText.color = CurrentSide == Side.Player ? Color.yellow : Color.red;        }
 
-        // 敌方回合时把"回合结束"按钮变灰（点了也没用）
+        // 敌方回合时把"回合结束"按钮变灰（点了也没用）；演算中也禁用
         if (endTurnButton != null)
-            endTurnButton.interactable = IsPlayerTurn;
+            endTurnButton.interactable = IsPlayerTurn && !IsReplaying;
     }
 
     // ══════════ UI：右下角"回合结束"按钮 ══════════
