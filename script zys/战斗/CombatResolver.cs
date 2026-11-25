@@ -61,7 +61,7 @@ public static class CombatResolver
             {
                 shot.outcome = ShotOutcome.NearMiss;
                 shot.effectiveArmor = 0f;
-                shot.damage = target.maxHp * 0.01f;      // 固定 1% 溅射
+                shot.damage = target.maxHp * CombatSettings.Instance.nearMissSplashRatio;      // 固定 1% 溅射
 
                 if ((float)rng.NextDouble() < shell.floodChanceNearMiss)
                     shot.debuff = DebuffType.Flooding;
@@ -145,7 +145,7 @@ public static class CombatResolver
         // 近失：落点在船旁边的格子
         shot.zone = HitZone.NearMiss;
         shot.outcome = ShotOutcome.NearMiss;
-        shot.damage = target.maxHp * 0.01f;
+        shot.damage = target.maxHp * CombatSettings.Instance.nearMissSplashRatio;
         if ((float)rng.NextDouble() < shell.floodChanceNearMiss)
             shot.debuff = DebuffType.Flooding;
         return shot;
@@ -216,6 +216,7 @@ public static class CombatResolver
     /// <summary>按命中部位和弹种挑 debuff</summary>
     static DebuffType SelectDebuff(HitZone zone, ShellSpec shell, System.Random rng)
     {
+        CombatSettings cfg = CombatSettings.Instance;
         float r = (float)rng.NextDouble();
 
         switch (zone)
@@ -226,13 +227,13 @@ public static class CombatResolver
 
             case HitZone.Bridge:
                 if (r < shell.fireChanceBridge) return DebuffType.Fire;
-                if (r < shell.fireChanceBridge + 0.25f) return DebuffType.Gun;
+                if (r < shell.fireChanceBridge + cfg.bridgeGunChance) return DebuffType.Gun;
                 return DebuffType.None;
 
             case HitZone.Waterline:
                 if (r < shell.floodChanceWaterline) return DebuffType.Flooding;
-                if (r < shell.floodChanceWaterline + 0.15f) return DebuffType.Engine;
-                if (r < shell.floodChanceWaterline + 0.23f) return DebuffType.Magazine;
+                if (r < shell.floodChanceWaterline + cfg.waterlineEngineChance) return DebuffType.Engine;
+                if (r < shell.floodChanceWaterline + cfg.waterlineEngineChance + cfg.waterlineMagazineChance) return DebuffType.Magazine;
                 return DebuffType.None;
 
             default:

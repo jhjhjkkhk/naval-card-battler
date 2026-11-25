@@ -33,6 +33,9 @@ public class AttackRangeVisualizer : MonoBehaviour
     [Tooltip("攻击范围 = 移动范围 + 这个圈数")]
     public int extraRings = 2;
 
+    [Tooltip("直接指定攻击范围（格）。填 0 才用「移动范围 + extraRings」")]
+    public int rangeHexOverride = 0;
+
     HexGrid grid;
     Material rangeMat, aimMat;
 
@@ -172,7 +175,11 @@ public class AttackRangeVisualizer : MonoBehaviour
 
         ShipMover mv = ship.GetComponent<ShipMover>();
         int moveR = mv != null ? mv.moveRangeHexes : 3;
-        int maxR = moveR + Mathf.Max(extraRings, 1);
+        int maxR = rangeHexOverride > 0 ? rangeHexOverride : moveR + Mathf.Max(extraRings, 1);
+
+        Debug.Log("[攻击范围] 船=" + ship.shipName + " 移动力=" + moveR
+                  + " extraRings=" + extraRings + " 覆盖=" + rangeHexOverride
+                  + " → 实际半径 " + maxR + " 格");
 
         Vector3 forward = ship.transform.forward;
         lastForward = forward;

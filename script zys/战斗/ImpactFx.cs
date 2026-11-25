@@ -24,7 +24,7 @@ public class ImpactFx : MonoBehaviour
     // ------------------------------------------------------------------ 预算
 
     // 一轮齐射里同类特效最多几个（避免 9 门炮刷 9 个爆炸糊成一片）
-    public static int maxPerSalvo = 2;
+    static int MaxPerSalvo { get { return CombatSettings.Instance.maxFxPerSalvo; } }
     static readonly System.Collections.Generic.Dictionary<FxKind, int> counts
         = new System.Collections.Generic.Dictionary<FxKind, int>();
 
@@ -38,7 +38,7 @@ public class ImpactFx : MonoBehaviour
     {
         int n;
         counts.TryGetValue(kind, out n);
-        if (n >= maxPerSalvo) return false;
+        if (n >= MaxPerSalvo) return false;
         counts[kind] = n + 1;
         return true;
     }

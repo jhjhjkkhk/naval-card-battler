@@ -44,7 +44,8 @@ public class ShipSink : MonoBehaviour
     IEnumerator SinkRoutine()
     {
         float t = 0f;
-        float duration = 3.5f;
+        CombatSettings cfg = CombatSettings.Instance;
+        float duration = cfg.sinkDuration;
         Vector3 start = transform.position;
         Quaternion startRot = transform.rotation;
 
@@ -53,8 +54,8 @@ public class ShipSink : MonoBehaviour
             t += Time.deltaTime;
             float k = Mathf.Clamp01(t / duration);
 
-            transform.position = start + Vector3.down * (k * 14f);
-            transform.rotation = startRot * Quaternion.Euler(0f, 0f, Mathf.Lerp(0f, 35f, k));
+            transform.position = start + Vector3.down * (k * cfg.sinkDepth);
+            transform.rotation = startRot * Quaternion.Euler(0f, 0f, Mathf.Lerp(0f, cfg.sinkTiltDegrees, k));
 
             yield return null;
         }

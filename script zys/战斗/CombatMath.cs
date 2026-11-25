@@ -30,22 +30,27 @@ public static class CombatMath
     /// <summary>近失率 = 10% + 20% × (距离 / 最大射程)</summary>
     public static float NearMissChance(float distanceHex, float maxRangeHex)
     {
-        if (maxRangeHex <= 0.01f) return 0.10f;
+        CombatSettings s = CombatSettings.Instance;
+        if (maxRangeHex <= 0.01f) return s.nearMissBase;
         float t = Mathf.Clamp01(distanceHex / maxRangeHex);
-        return 0.10f + 0.20f * t;
+        return s.nearMissBase + s.nearMissPerRange * t;
     }
 
     /// <summary>掷部位：近失按距离算，其余三个按 2:3:3 分摊</summary>
     public static HitZone RollZone(float nearMissChance, float roll01)
     {
-        float nm = Mathf.Clamp(nearMissChance, 0f, 0.9f);
+        CombatSettings s = CombatSettings.Instance;
 
+        float nm = Mathf.Clamp(nearMissChance, 0f, s.nearMissMax);
         if (roll01 < nm) return HitZone.NearMiss;
 
-        // 剩余概率按 甲板2 : 舰桥3 : 水线3 分配
+        // 剩余概率按权重分配（默认 甲板2 : 舰桥3 : 水线3）
+        float total = s.zoneWeightDeck + s.zoneWeightBridge + s.zoneWeightWaterline;
+        if (total <= 0.001f) total = 8f;
+
         float rest = 1f - nm;
-        float deckEnd = nm + rest * (2f / 8f);
-        float bridgeEnd = nm + rest * (5f / 8f);
+        float deckEnd = nm + rest * (s.zoneWeightDeck / total);
+        float bridgeEnd = deckEnd + rest * (s.zoneWeightBridge / total);
 
         if (roll01 < deckEnd) return HitZone.Deck;
         if (roll01 < bridgeEnd) return HitZone.Bridge;
@@ -86,8 +91,12 @@ public static class CombatMath
     /// <summary>跳弹概率：α<30 必弹；30~45 线性；≥45 不弹</summary>
     public static float RicochetChance(float angle)
     {
-        if (angle < 30f) return 1f;
-        if (angle < 45f) return (45f - angle) / 15f;
+        CombatSettings s = CombatSettings.Instance;
+        float lo = s.ricochetMinAngle;
+        float hi = s.ricochetMaxAngle;
+
+        if (angle < lo) return 1f;
+        if (angle < hi) return (hi - angle) / Mathf.Max(hi - lo, 0.01f);
         return 0f;
     }
 
@@ -102,17 +111,18 @@ public static class CombatMath
     }
 
     /// <summary>穿深 = 基础穿深 × (1 - 衰减 × 距离/最大射程)</summary>
-    public static float Penetration(float basePenetration, float distanceHex, float maxRangeHex, float decay = 0.6f)
+    public static float Penetration(float basePenetration, float distanceHex, float maxRangeHex)
     {
         if (maxRangeHex <= 0.01f) return basePenetration;
         float t = Mathf.Clamp01(distanceHex / maxRangeHex);
-        return basePenetration * (1f - decay * t);
+        return basePenetration * (1f - CombatSettings.Instance.penetrationDecay * t);
     }
 
     /// <summary>碾压：穿深 ≥ 3 × 装甲 → 无视跳弹强制击穿</summary>
-    public static bool IsOvermatch(float penetration, float armor, float overmatchFactor = 3f)
+    public static bool IsOvermatch(float penetration, float armor)
     {
-        return armor > 0f && penetration >= overmatchFactor * armor;
+        float factor = CombatSettings.Instance.overmatchFactor;
+        return armor > 0f && penetration >= factor * armor;
     }
 
     // ---------------------------------------------------------------- 伤害
@@ -122,9 +132,10 @@ public static class CombatMath
     {
         if (effectiveArmor <= 0.01f) return baseDamage * critMultiplier;
 
+        CombatSettings s = CombatSettings.Instance;
         float ratio = penetration / effectiveArmor;
-        float mult = 1f + 0.3f * (ratio - 1f);
-        mult = Mathf.Clamp(mult, 1f, 2f);
+        float mult = 1f + s.damageRatioBonus * (ratio - 1f);
+        mult = Mathf.Clamp(mult, 1f, s.damageCapMultiplier);
         return baseDamage * mult * critMultiplier;
     }
 

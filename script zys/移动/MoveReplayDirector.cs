@@ -343,7 +343,7 @@ public class MoveReplayDirector : MonoBehaviour
             ShipDebuffs.Get(target).Apply(shot.debuff);
 
         // 弹药库殉爆
-        if (shot.debuff == DebuffType.Magazine && rng != null && rng.NextDouble() < 0.1)
+        if (shot.debuff == DebuffType.Magazine && rng != null && rng.NextDouble() < CombatSettings.Instance.magazineDetonateChance)
         {
             Debug.Log("[演算]   ★ 弹药库殉爆！" + target.shipName);
             ShipSink.Sink(target, "弹药库殉爆");

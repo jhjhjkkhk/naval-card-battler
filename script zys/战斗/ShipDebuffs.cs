@@ -25,7 +25,7 @@ public class ShipDebuffs : MonoBehaviour
     [Header("当前 debuff")]
     public List<Entry> active = new List<Entry>();
 
-    public const int DefaultTurns = 4;
+    public static int DefaultTurns { get { return CombatSettings.Instance.debuffTurns; } }
 
     // ------------------------------------------------------------------ 获取
 
@@ -51,9 +51,10 @@ public class ShipDebuffs : MonoBehaviour
 
     // ------------------------------------------------------------------ 施加
 
-    public void Apply(DebuffType t, int turns = DefaultTurns)
+    public void Apply(DebuffType t, int turns = -1)
     {
         if (t == DebuffType.None) return;
+        if (turns < 0) turns = DefaultTurns;
 
         Entry e = Find(t);
         if (e != null)
@@ -71,10 +72,10 @@ public class ShipDebuffs : MonoBehaviour
     // ------------------------------------------------------------------ 影响
 
     /// <summary>航速倍率</summary>
-    public float SpeedMultiplier { get { return Has(DebuffType.Engine) ? 0.6f : 1f; } }
+    public float SpeedMultiplier { get { return Has(DebuffType.Engine) ? CombatSettings.Instance.engineSpeedMultiplier : 1f; } }
 
     /// <summary>散布倍率（炮机受损 → 打得更散）</summary>
-    public float ScatterMultiplier { get { return Has(DebuffType.Gun) ? 1.3f : 1f; } }
+    public float ScatterMultiplier { get { return Has(DebuffType.Gun) ? CombatSettings.Instance.gunScatterMultiplier : 1f; } }
 
     /// <summary>本回合不能开火</summary>
     public bool CannotFire { get { return Has(DebuffType.Magazine); } }
@@ -89,12 +90,13 @@ public class ShipDebuffs : MonoBehaviour
 
         float loss = 0f;
 
-        if (Has(DebuffType.Fire)) loss += stats.maxHp * 0.05f;
-        if (Has(DebuffType.Flooding)) loss += stats.maxHp * 0.03f;
+        CombatSettings cfg = CombatSettings.Instance;
+        if (Has(DebuffType.Fire)) loss += stats.maxHp * cfg.fireDamagePerTurn;
+        if (Has(DebuffType.Flooding)) loss += stats.maxHp * cfg.floodDamagePerTurn;
 
         if (loss > 0f && stats.currentHp > 0)
         {
-            int dmg = Mathf.Max(1, Mathf.RoundToInt(loss));
+            int dmg = Mathf.Max(cfg.minDotDamage, Mathf.RoundToInt(loss));
             stats.currentHp = Mathf.Max(0, stats.currentHp - dmg);
             Debug.Log("[debuff] " + stats.shipName + " 持续伤害 " + dmg
                       + " → HP " + stats.currentHp + "/" + stats.maxHp);
