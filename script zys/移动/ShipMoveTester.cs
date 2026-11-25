@@ -163,6 +163,9 @@ public class ShipMoveTester : MonoBehaviour
             return;
         }
 
+        // 攻击模式下，点击交给 AttackMode 处理
+        if (AttackMode.IsActive) return;
+
         if (Input.GetMouseButtonDown(0)) OnLeftClick();
         if (Input.GetMouseButtonDown(1)) Deselect();
     }
@@ -255,9 +258,19 @@ public class ShipMoveTester : MonoBehaviour
 
         if (preview != null) preview.Show(mover, path);
 
+        reselectStats = mover.GetComponent<ShipStats>();
+
         Debug.Log(alreadyOrdered
             ? "[移动] 修改目 " + target + "（不额外消耗决策值）"
             : "[移动] 下达指令 " + target + "，消耗 " + (TurnManager.Instance != null ? TurnManager.Instance.moveDecisionCost : 0) + " 点决策值");
+    }
+
+    ShipStats reselectStats;
+
+    void LateUpdate()
+    {
+        // 点格子时 ShipSelector 会误判成"点水面"并取消选中，这里补回来
+        // 取消选中已交给 ShipSelector 的开关控制（点水面不再取消），这里什么都不用做
     }
 
     void Select(ShipMover m)
@@ -267,7 +280,11 @@ public class ShipMoveTester : MonoBehaviour
 
         // 点船体时，让原有的船只选择系统同步选中（信息牌会展开）
         ShipStats stats = m.GetComponent<ShipStats>();
-        if (stats != null) ShipSelector.SelectShip(stats);
+        if (stats != null)
+        {
+            ShipSelector.SelectShip(stats);
+            reselectStats = stats;        // 选中后就锁住，直到右键取消
+        }
 
         Debug.Log("[移动] 选中 " + m.name);
     }
@@ -277,6 +294,8 @@ public class ShipMoveTester : MonoBehaviour
         if (mover == null) return;
         Debug.Log("[移动] 取消选中 " + mover.name);
         mover = null;
+        ShipSelector.DeselectShip();      // 右键才是唯一取消选中的方式
+        reselectStats = null;
         if (visualizer != null) visualizer.HideAll();
         // 注意：虚影和虚线保留 —— 指令已经下过了
     }

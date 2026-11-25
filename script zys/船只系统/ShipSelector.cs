@@ -21,6 +21,9 @@ public class ShipSelector : MonoBehaviour
     public float outlineYOffset = 0.2f; // 圈比船底抬高多少（防止插进海里看不见）
     public float seaLevel = 0f;         // 海面高度，如果海水在 y=0 就保持 0
 
+    // 默认关：点水面不再取消选中，取消选中只由右键触发
+    public static bool allowDeselectOnWorldClick = false;
+
     private Camera cam;
     private LineRenderer outline;          // 当前选中目标的白框
     private float outlineRx;               // 缓存：横半轴
@@ -48,7 +51,7 @@ public class ShipSelector : MonoBehaviour
             ShipStats ship = hit.collider.GetComponentInParent<ShipStats>();
             if (ship != null) { Select(ship); return; }
         }
-        Deselect();   // 点到水面或空处 → 取消选中
+        if (allowDeselectOnWorldClick) Deselect();   // 默认不取消：取消选中交给右键
     }
 
     // 选中某艘船（点船时走这里；信息牌展开时也会通过 SelectShip 调用本方法）

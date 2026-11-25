@@ -319,7 +319,11 @@ public class ShipMover : MonoBehaviour
 
         // speedHexPerSecond / accelHexPerSecond2 / decelHexPerSecond2 的单位都是「格/秒」，这里换算成世界单位
         float spacing = HexSpacing();
-        float vMax = speedHexPerSecond * spacing;
+        // 轮机破损 → 航速下降
+        ShipDebuffs debuff = GetComponent<ShipDebuffs>();
+        float speedMul = debuff != null ? debuff.SpeedMultiplier : 1f;
+
+        float vMax = speedHexPerSecond * spacing * speedMul;
         float aAcc = accelHexPerSecond2 * spacing;
         float aDec = decelHexPerSecond2 * spacing;
 

@@ -164,6 +164,7 @@ public class TurnManager : MonoBehaviour
         Debug.Log("=== 我方回合开始，行动值 " + CurrentAP + "，决策值 " + DecisionPoints + " ===");
 
         TickAllBuffs();   // ★ 我方回合开始 → 所有船的 buff 剩余回合 -1，到 0 的消除
+        ShipDebuffs.TickAll();   // ★ 起火 / 漏水 的持续伤害，以及 debuff 倒计时
 
         if (dealer != null) dealer.DealCards();   // ★ 自动发牌，不用点按钮
         RefreshAPUI();

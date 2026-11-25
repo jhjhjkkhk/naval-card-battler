@@ -55,6 +55,81 @@ public class ShipStats : MonoBehaviour
     public int baseDefense = 5;
     public int maxHp = 100;
 
+    // ------------------------------------------------------------------
+    // 以下为「射击系统」用的数值（2026-11 新增，默认值 = 战列舰）
+    // 右键组件 → "按舰种填入推荐数值" 可一键套用驱逐舰/巡洋舰/战列舰
+    // ------------------------------------------------------------------
+
+    public enum ShipClass { Destroyer, Cruiser, Battleship }
+
+    [Header("舰种")]
+    public ShipClass shipClass = ShipClass.Battleship;
+
+    [Header("装甲（毫米）")]
+    [Tooltip("甲板：水平装甲，挡远距离落弹")]
+    public float armorDeck = 180f;
+    [Tooltip("水线：主装甲带，最厚")]
+    public float armorBelt = 350f;
+    [Tooltip("舰桥：司令塔")]
+    public float armorTower = 250f;
+
+    [Header("武备")]
+    [Tooltip("炮塔数量")]
+    public int turretCount = 3;
+    [Tooltip("每座炮塔的门数")]
+    public int barrelsPerTurret = 3;
+    [Tooltip("最大射程（格）")]
+    public float maxRangeHex = 40f;
+    [Tooltip("散布系数：每格降低多少命中率")]
+    public float dispersionPerHex = 0.015f;
+    [Tooltip("零距离基础穿深（毫米）")]
+    public float basePenetration = 700f;
+    [Tooltip("单发基础伤害")]
+    public float baseDamage = 220f;
+    [Tooltip("转正角（度），第一版固定 0，字段留给二期")]
+    public float normalization = 0f;
+
+    /// <summary>总门数 = 炮塔 × 每塔门数</summary>
+    public int TotalBarrels { get { return turretCount * barrelsPerTurret; } }
+
+    /// <summary>按当前 shipClass 填入推荐数值（Inspector 右键菜单）</summary>
+    [ContextMenu("按舰种填入推荐数值")]
+    public void ApplyClassDefaults()
+    {
+        switch (shipClass)
+        {
+            case ShipClass.Destroyer:
+                armorDeck = 25f; armorBelt = 30f; armorTower = 15f;
+                turretCount = 3; barrelsPerTurret = 2;
+                maxRangeHex = 15f; basePenetration = 120f; baseDamage = 40f;
+                maxHp = 1200;
+                break;
+
+            case ShipClass.Cruiser:
+                armorDeck = 65f; armorBelt = 130f; armorTower = 100f;
+                turretCount = 4; barrelsPerTurret = 2;
+                maxRangeHex = 25f; basePenetration = 300f; baseDamage = 90f;
+                maxHp = 3000;
+                break;
+
+            default: // Battleship
+                armorDeck = 180f; armorBelt = 350f; armorTower = 250f;
+                turretCount = 3; barrelsPerTurret = 3;
+                maxRangeHex = 40f; basePenetration = 700f; baseDamage = 220f;
+                maxHp = 8000;
+                break;
+        }
+
+        dispersionPerHex = 0.015f;
+        normalization = 0f;
+
+        Debug.Log("[数值] " + shipName + " 已套用 " + shipClass + " 默认值："
+                  + "装甲 " + armorDeck + "/" + armorBelt + "/" + armorTower
+                  + "，炮 " + turretCount + "×" + barrelsPerTurret
+                  + "，射程 " + maxRangeHex + " 格，穿深 " + basePenetration
+                  + "，伤害 " + baseDamage + "，血量 " + maxHp);
+    }
+
     [Header("buff 设置")]
     public int buffDefaultTurns = 1;          // ★ 新 buff 默认持续几回合（1 = 下个己方回合开始时消失）
 
